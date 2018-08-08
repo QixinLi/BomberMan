@@ -159,7 +159,7 @@ public class GameFrame extends JFrame implements KeyListener{
 		jp.add(label);
 	    this.add(jp);
 	    setVisible(true);
-	    //new Thread(new PaintThread1()).start();//键盘监听线程启动
+	    new Thread(new PaintThread1()).start();//键盘监听线程启动
 	    // new Thread(new PaintThread2()).start();//键盘监听线程启动
 	    new Thread(new PaintThreadAI2()).start();
 	}
@@ -296,27 +296,11 @@ public class GameFrame extends JFrame implements KeyListener{
 	
 	private class PaintThreadAI2 implements Runnable {
 		public void run() {
-			while (player2.isalive) {//设置一个死循环，保持程序对键盘事件的监听
-				//meetbox(player2);//在遇到碰撞物的情况下返回
-				if(player2.thisbomb!=null)
-				{
-					if(player2.thisbomb.isExistPlayer)//判断玩家是否在当前炸弹上（一旦离开玩家当前放置的炸弹，便不可再次站上去）
-					{
-						player2.ontheboom();
-					}
-				}
-				if(!player2.isMoving)
-				{
-					
-					player2.isMoving=true;
-					player2.AIgo();
-					player2.DropBomb();
-				}
-				try {
-					Thread.sleep(40);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
+			try {
+				player2.AIgo();
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
 		}
 	}

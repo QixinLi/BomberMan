@@ -13,6 +13,7 @@ class box extends JLabel{
 	boolean needDetonate=false;//是否需要引爆
 	boolean isExistPlayer=true;//*炸弹*是否站了人
 	boolean isBoomArea=false;//此处是否是爆炸区域
+	boolean isDangerArea=false;//此处是否为危险区域（即将爆炸）
 	Bomb boom;//此处的炸弹参数 
 	/*************************************************************/
 	boolean candestroy;//是否可破坏
@@ -88,6 +89,17 @@ class link
 	public link(int dir)
 	{
 		this.dirindex=dir;
+	}
+}
+
+class Path
+{
+	int x;
+	int y;
+	Path beforePath;
+	public Path(int x,int y){
+		this.x=x;
+		this.y=y;
 	}
 }
 

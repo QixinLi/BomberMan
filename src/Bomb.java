@@ -36,7 +36,14 @@ public class Bomb{
 					mybox.isExistPlayer=true;
 					myplayer.bombexist++;//玩家当前存在的炸弹数+1
 					try {
-						Thread.sleep(2000);
+						int DangerTime=(80/GameFrame.player2.speed)*40*4;
+						if(DangerTime>2000) {
+							DangerTime=2000;
+						}
+						//System.out.println("dangertime"+DangerTime);
+						Thread.sleep(2000-DangerTime);
+						setDangerArea();
+						Thread.sleep(DangerTime);
 					} catch (InterruptedException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
@@ -48,6 +55,7 @@ public class Bomb{
 				}
 			};
 			th.start();
+			System.out.println("丢炸弹");
 		}
 	}
 	
@@ -164,11 +172,20 @@ public class Bomb{
 		}
 	}
 
+	public void setDangerArea()
+	{
+		for(int i=0;i<bombarea.size();i++)
+		{
+			bombarea.get(i).isDangerArea=true;
+		}
+	}
+	
 	public void removeBoomArea()
 	{
 		for(int i=0;i<bombarea.size();i++)
 		{
 			bombarea.get(i).isBoomArea=false;
+			bombarea.get(i).isDangerArea=false;
 		}
 	}
 	

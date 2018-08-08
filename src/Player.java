@@ -18,7 +18,7 @@ public class Player extends JLabel implements KeyListener{
 	boolean isalive=true;//玩家是否存活
 	int speed=10;//玩家当前速度，初始10
 	int maxspeed=20;//玩家速度限制最大值
-	int bombnum=2;//玩家同时可投炸弹数，初始2
+	int bombnum=1;//玩家同时可投炸弹数，初始1
 	int maxbombnum=6;//玩家可投炸弹数限制最大值
 	int bombexist=0;//现存的炸弹数
 	int power=1;//玩家当前炸弹威力，初始1
@@ -26,12 +26,15 @@ public class Player extends JLabel implements KeyListener{
 	
 	/********************************AI************************************/
 	List<box> canGo=new ArrayList<box>();
-	List<link> path=new ArrayList<link>();
+	//List<link> path=new ArrayList<link>();
 	boolean isCheck[][]=new boolean[15][12];
 	boolean canCalPath=false;
 	boolean isMoving=false;
+	                    /**V2.0**/
+	List<Path> path=new ArrayList<Path>();
+	List<link> way2Go=new ArrayList<link>();
+	boolean isGetTreasure=false;//是否拿到了宝物
 	/**********************************************************************/
-	
 	
 	PlayerAttribute pla;//玩家属性面板
 	
@@ -277,186 +280,320 @@ public class Player extends JLabel implements KeyListener{
 		}
 	}
 
-	public void AIgo()
+	public void AIgo() throws Exception
 	{
-		isMoving=true;
+		int n=999;
 		do
 		{
-			calCanGo();
-		}while(!canCalPath);
-		if(path.size()!=0)
-		{
-			System.out.println("开始移动");
-			for(int i=0;i<path.size();i++)
+			if((n == 999 || ( this.x/80 == path.get(n).x && this.y/80 == path.get(n).y )))              //已经到达目的地
 			{
-				switch(path.get(i).dirindex)
-				{
-				case 1:
-					dir=Direction.U;
-					break;
-				case 2:
-					dir=Direction.D;
-					break;
-				case 3:
-					dir=Direction.L;
-					break;
-				case 4:
-					dir=Direction.R;
-					break;
-				default:
-					break;
+				Thread.sleep(10);
+				if(n!=999&&!isGetTreasure) {
+					DropBomb();
 				}
-				System.out.println(dir);
-				move();
-				GameFrame.meetbox(this);
-				if(this.thisbomb!=null)
+				isGetTreasure=false;
+				findBlock(this.x/80,this.y/80);//找到所有能到达的格子，并描绘路径
+				n=getOnePoint();//取一安全的点
+				drawPath(n);//描绘路径
+				move1Step();//移动一步
+			}
+			else if(!GameFrame.thismap.getBoxByXY(path.get(n).x,path.get(n).y).isDangerArea)    //点安全
+			{
+				Path ptemp = path.get(n);
+				findBlock(this.x/80,this.y/80);//找到所有能到达的格子，并描绘路径
+				//System.out.println(n+"."+path.get(n).x+","+path.get(n).y+"..."+this.x/80+","+this.y/80);
+				int i;
+				for(i=0;i<path.size();i++) //重新寻路
 				{
-					if(this.thisbomb.isExistPlayer)//判断玩家是否在当前炸弹上（一旦离开玩家当前放置的炸弹，便不可再次站上去）
-					{
-						ontheboom();
+					if(path.get(i).x==ptemp.x && path.get(i).y==ptemp.y) {
+						n=i;
+						break;
 					}
 				}
+				if(i>=path.size()) //点不可达
+				{
+					System.out.println("点不可达");
+					n=getOnePoint();
+					drawPath(n);//取一安全的点并描绘路径
+					move1Step();//移动一步
+				}
+				else  								//点可达
+				{
+					System.out.println("点可达");
+					drawPath(n);//取一安全的点并描绘路径
+					move1Step();//移动一步
+				}
 			}
-			System.out.println("丢炸弹");
-		}
-		isMoving=false;
+			else                                                                                 //点不安全
+			{
+				System.out.println("点不安全");
+				findBlock(this.x/80,this.y/80);//找到所有能到达的格子，并描绘路径
+				n=getOnePoint();
+				drawPath(n);//取一安全的点并描绘路径
+				move1Step();//移动一步
+			}
+		}while(this.live>0);
 	}
 	
 	public void DropBomb()
 	{
 		new Bomb(this);
+		//System.out.println("丢炸弹");
 	}
 	
-	public void calCanGo2()
-	{
-		boolean isget=false;
-		Random ra=new Random();
-		int i,j;
-		do{
-			do{
-				i=ra.nextInt(15);
-				j=ra.nextInt(12);
-			}while(((this.x/80)==i&&(this.y/80)==j)
-						||GameFrame.thismap.getBoxByXY(i,j).isExist
-							||GameFrame.thismap.getBoxByXY(i,j).isBoomArea
-							||GameFrame.thismap.getBoxByXY(i,j).isExistBomb);
-			int x=this.x/80;
-			int y=this.y/80;
-			for(int u=0;u<15;u++)
-				for(int t=0;t<12;t++)
-					isCheck[u][t]=false;
-			path.clear();
-			canCalPath=false;
-			try {  
-				calPath(x,y,i,j);
-	        } catch (StopMsgException e) {  
-	        }
-			if(canCalPath)
-			{
-				isget=true;
-			}
-		}while(!isget);
-	}
-	
-	public void calCanGo()
-	{
-		boolean isget=false;
-		for(int j=0;j<12&&!isget;j++)
+	public void findBlock(int x,int y) {
+		boolean isSet=true;
+		path.clear();
+		List<Path> temp=new ArrayList<Path>();
+		
+		for(int u=0;u<15;u++)
+			for(int t=0;t<12;t++)
+				isCheck[u][t]=false;
+		
+		isCheck[x][y]=true;
+		Path firstpath=new Path(x,y);
+		firstpath.beforePath=new Path(999,999);
+		path.add(firstpath);
+		int i=0;
+		while(isSet) 
 		{
-			for(int i=0;i<15&&!isget;i++)
-			{
-				/*System.out.print(!GameFrame.thismap.getBoxByXY(i,j).isExist&&!GameFrame.thismap.getBoxByXY(i,j).isBoomArea&&!GameFrame.thismap.getBoxByXY(i,j).isExistBomb);
-				System.out.print(" ");*/
-				if((this.x/80)!=i||(this.y/80)!=j)
-				{	
-					if(!GameFrame.thismap.getBoxByXY(i,j).isExist
-							&&!GameFrame.thismap.getBoxByXY(i,j).isBoomArea
-							&&!GameFrame.thismap.getBoxByXY(i,j).isExistBomb)
-					{
-						int x=this.x/80;
-						int y=this.y/80;
-						for(int u=0;u<15;u++)
-							for(int t=0;t<12;t++)
-								isCheck[u][t]=false;
-						path.clear();
-						canCalPath=false;
-						try {  
-							calPath(x,y,i,j);
-				        } catch (StopMsgException e) {  
-				        }
-						if(canCalPath)
-						{
-							isget=true;
+			temp.clear();
+			isSet=false;
+			for(;i<path.size();i++) {
+				int nowX=path.get(i).x;
+				int nowY=path.get(i).y;
+				//上
+				if(nowX>=0 && nowX<15 && (nowY-1)>=0 && (nowY-1)<12) {
+					if(!(GameFrame.thismap.getBoxByXY(nowX,nowY-1).isExist&&!GameFrame.thismap.getBoxByXY(nowX,nowY-1).isdestroyshowT)
+							&&!GameFrame.thismap.getBoxByXY(nowX,nowY-1).isExistBomb
+							&&!isCheck[nowX][nowY-1]) {
+						Path temppath = new Path(nowX,nowY-1);
+						temppath.beforePath = path.get(i);
+						isCheck[nowX][nowY-1] = true;
+						temp.add(temppath);
+						//System.out.println("add:"+(nowX)+","+(nowY-1));
+						isSet=true;
+					}
+				}
+				//下
+				if(nowX>=0 && nowX<15 && (nowY+1)>=0 && (nowY+1)<12) {
+					if(!(GameFrame.thismap.getBoxByXY(nowX,nowY+1).isExist&&!GameFrame.thismap.getBoxByXY(nowX,nowY+1).isdestroyshowT)
+							&&!GameFrame.thismap.getBoxByXY(nowX,nowY+1).isExistBomb
+							&&!isCheck[nowX][nowY+1]) {
+						Path temppath = new Path(nowX,nowY+1);
+						temppath.beforePath = path.get(i);
+						isCheck[nowX][nowY+1] = true;
+						temp.add(temppath);
+						isSet=true;
+						//System.out.println("add:"+(nowX)+","+(nowY+1));
+					}
+				}
+				//左
+				if((nowX-1)>=0 && (nowX-1)<15 && nowY>=0 && nowY<12) {
+					if(!(GameFrame.thismap.getBoxByXY(nowX-1,nowY).isExist&&!GameFrame.thismap.getBoxByXY(nowX-1,nowY).isdestroyshowT)
+							&&!GameFrame.thismap.getBoxByXY(nowX-1,nowY).isExistBomb
+							&&!isCheck[nowX-1][nowY]) {
+						Path temppath = new Path(nowX-1,nowY);
+						temppath.beforePath = path.get(i);
+						isCheck[nowX-1][nowY] = true;
+						temp.add(temppath);
+						isSet=true;
+						//System.out.println("add:"+(nowX-1)+","+(nowY));
+					}
+				}
+				//右
+				if((nowX+1)>=0 && (nowX+1)<15 && nowY>=0 && nowY<12) {
+					if(!(GameFrame.thismap.getBoxByXY(nowX+1,nowY).isExist&&!GameFrame.thismap.getBoxByXY(nowX+1,nowY).isdestroyshowT)
+							&&!GameFrame.thismap.getBoxByXY(nowX+1,nowY).isExistBomb
+							&&!isCheck[nowX+1][nowY]) {
+						Path temppath = new Path(nowX+1,nowY);
+						temppath.beforePath = path.get(i);
+						isCheck[nowX+1][nowY] = true;
+						temp.add(temppath);
+						isSet=true;
+						//System.out.println("add:"+(nowX+1)+","+(nowY));
+					}
+				}
+			}
+			path.addAll(temp);
+			temp.clear();
+		}
+	}
+	
+	public int getOnePoint() {
+		Random ra=new Random();
+		
+		for(int i=1;i<path.size();) {
+			if(GameFrame.thismap.getBoxByXY(path.get(i).x,path.get(i).y).isDangerArea) {
+				path.remove(i);
+			}
+			else {
+				i++;
+			}
+		}
+		int n=0;
+		if(path.size()==1) {
+			return n;
+		}
+		else {
+			boolean isTreasure=false,isPlayer=false,isBox=false;
+			/*******************取宝藏点********************/
+			for(int i=1;i<path.size();i++) {
+				if(GameFrame.thismap.getBoxByXY(path.get(i).x,path.get(i).y).isdestroyshowT&&GameFrame.thismap.getBoxByXY(path.get(i).x,path.get(i).y).isExist) {
+					n=i;
+					isTreasure=true;
+					isGetTreasure=true;
+					break;
+				}
+			}
+			/*******************取玩家点********************/
+			if(!isTreasure) {
+				for(int i=1;i<path.size();i++) {
+					if((path.get(i).x) == (GameFrame.player1.getX()/80) && path.get(i).y == (GameFrame.player1.getY()/80)) {
+						n=i;
+						isPlayer=true;
+						break;
+					}
+				}
+			}
+			/*******************取箱子**********************/
+			
+			if(!isTreasure&&!isPlayer) {
+				List<Path> boxpath=new ArrayList<Path>();
+				for(int i=0;i<path.size();i++) {
+					if(path.get(i).x-1>=0) {
+						if(!GameFrame.thismap.getBoxByXY(path.get(i).x-1,path.get(i).y).isdestroyshowT
+								&&GameFrame.thismap.getBoxByXY(path.get(i).x-1,path.get(i).y).isExist
+								&&GameFrame.thismap.getBoxByXY(path.get(i).x-1,path.get(i).y).candestroy) {
+							n=i;
+							boxpath.add(path.get(i));
+						}
+					}
+					if(path.get(i).x+1<15) {
+						if(!GameFrame.thismap.getBoxByXY(path.get(i).x+1,path.get(i).y).isdestroyshowT
+								&&GameFrame.thismap.getBoxByXY(path.get(i).x+1,path.get(i).y).isExist
+								&&GameFrame.thismap.getBoxByXY(path.get(i).x+1,path.get(i).y).candestroy) {
+							n=i;
+							boxpath.add(path.get(i));
+						}
+					}
+					if(path.get(i).y-1>=0) {
+						if(!GameFrame.thismap.getBoxByXY(path.get(i).x,path.get(i).y-1).isdestroyshowT
+								&&GameFrame.thismap.getBoxByXY(path.get(i).x,path.get(i).y-1).isExist
+								&&GameFrame.thismap.getBoxByXY(path.get(i).x,path.get(i).y-1).candestroy) {
+							n=i;
+							boxpath.add(path.get(i));
+						}
+					}
+					if(path.get(i).y+1<12) {
+						if(!GameFrame.thismap.getBoxByXY(path.get(i).x,path.get(i).y+1).isdestroyshowT
+								&&GameFrame.thismap.getBoxByXY(path.get(i).x,path.get(i).y+1).isExist
+								&&GameFrame.thismap.getBoxByXY(path.get(i).x,path.get(i).y+1).candestroy) {
+							n=i;
+							boxpath.add(path.get(i));
 						}
 					}
 				}
-				
+				if(!boxpath.isEmpty()) {
+					isBox=true;
+					Random rad=new Random();
+					n=rad.nextInt(boxpath.size());
+					for(int j=0;j<path.size();j++) {
+						if(path.get(j).x==boxpath.get(n).x&&path.get(j).y==boxpath.get(n).y) {
+							n=j;
+							break;
+						}
+					}
+				}
 			}
-			//System.out.println();
+			/*******************随机取点********************/
+			if(!isTreasure&&!isPlayer&&!isBox) {
+				do {
+					n=ra.nextInt(path.size());
+				}while(n==0);
+			}
 		}
-		//System.out.println();
+		return n;
 	}
 	
-	
-	private void calPath(int x,int y,int targetx,int targety)
-	{
-		if(x==targetx&&y==targety)
-		{
-			System.out.println("-计算出路径-");
-			canCalPath=true;
-			throw new StopMsgException();
-		}
-		else if(isbox(x,y)||isCheck[x][y])
-		{
-			if(path.size()>=1)
-			{
-				path.remove(path.size()-1);//将顶层的结点移除
+	public void drawPath(int n) throws Exception {
+		way2Go.clear();
+		SqStack sqStack=new SqStack(100);
+		for(Path p=path.get(n);;p=p.beforePath) {
+			sqStack.push(p);
+			if(p.beforePath.x==999&&p.beforePath.y==999) {
+				break;
 			}
 		}
-		else
-		{
-			isCheck[x][y]=true;
-			//向上递归
-			if(x-1>=0)
-			{
-				if(!isCheck[x-1][y])
+		Path p1=sqStack.pop();
+		Path p2;
+		int length=sqStack.length();
+		for(int i=0;i<length;i++) {
+			p2=sqStack.pop();
+			if(p2.x==p1.x) {
+				if(p2.y+1==p1.y) //上
 				{
-					path.add(new link(1));
-					calPath(x-1,y,targetx,targety);
+					way2Go.add(new link(1));
+				}
+				else if(p2.y-1==p1.y) //下
+				{
+					way2Go.add(new link(2));
 				}
 			}
-			//向下递归
-			if(x+1<15)
-			{
-				if(!isCheck[x+1][y])
+			else if(p2.y==p1.y) {
+				if(p2.x+1==p1.x) //左
 				{
-					path.add(new link(2));
-					calPath(x+1,y,targetx,targety);
+					way2Go.add(new link(3));
+				}
+				else if(p2.x-1==p1.x) //右
+				{
+					way2Go.add(new link(4));
 				}
 			}
-			//向左递归
-			if(y-1>=0)
-			{
-				if(!isCheck[x][y-1])
-				{
-					path.add(new link(3));
-					calPath(x,y-1,targetx,targety);
-				}
-			}
-			//向右递归
-			if(y+1<12)
-			{
-				if(!isCheck[x][y+1])
-				{
-					path.add(new link(4));
-					calPath(x,y+1,targetx,targety);
-				}
-			}
-			isCheck[x][y]=false;
+			p1=p2;
 		}
-		
+		if(GameFrame.thismap.getBoxByXY(p1.x,p1.y).isDangerArea) 
+		{
+			way2Go.clear();
+		}
 	}
 	
+	public void move1Step() {
+		if(way2Go.size()==0) {
+			//System.out.println("不知道要干啥");
+			return;
+		}
+		else {
+			switch(way2Go.get(0).dirindex)
+			{
+			case 1:
+				dir=Direction.U;
+				break;
+			case 2:
+				dir=Direction.D;
+				break;
+			case 3:
+				dir=Direction.L;
+				break;
+			case 4:
+				dir=Direction.R;
+				break;
+			default:
+				break;
+			}
+			System.out.println(dir);
+			move();
+			GameFrame.meetbox(this);
+			if(this.thisbomb!=null)
+			{
+				if(this.thisbomb.isExistPlayer)//判断玩家是否在当前炸弹上（一旦离开玩家当前放置的炸弹，便不可再次站上去）
+				{
+					ontheboom();
+				}
+			}
+		}
+	}
+
 	public void setIcon(String file)//设置图片自适应窗口大小（用于线程）
 	{  
 		  ImageIcon ico=new ImageIcon(file);  
@@ -579,7 +716,7 @@ public class Player extends JLabel implements KeyListener{
 	public void ontheboom()//当玩家不在当前炸弹上后，参数设置false。
 	{
 		if(this.thisbomb!=null){
-			if(!this.thisbomb.getRect().intersects(this.getRect()))
+			if(!this.thisbomb.getRect().intersects(GameFrame.player1.getRect())&&!this.thisbomb.getRect().intersects(GameFrame.player2.getRect()))
 			{
 				this.thisbomb.isExistPlayer=false;
 			}
