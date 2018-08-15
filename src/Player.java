@@ -312,21 +312,21 @@ public class Player extends JLabel implements KeyListener{
 				}
 				if(i>=path.size()) //点不可达
 				{
-					System.out.println("点不可达");
+					System.out.print("点不可达");
 					n=getOnePoint();
 					drawPath(n);//取一安全的点并描绘路径
 					move1Step();//移动一步
 				}
 				else  								//点可达
 				{
-					System.out.println("点可达");
+					System.out.print("点可达");
 					drawPath(n);//取一安全的点并描绘路径
 					move1Step();//移动一步
 				}
 			}
 			else                                                                                 //点不安全
 			{
-				System.out.println("点不安全");
+				System.out.print("点不安全");
 				findBlock(this.x/80,this.y/80);//找到所有能到达的格子，并描绘路径
 				n=getOnePoint();
 				drawPath(n);//取一安全的点并描绘路径
@@ -559,6 +559,7 @@ public class Player extends JLabel implements KeyListener{
 	}
 	
 	public void move1Step() {
+		boolean isDangerAround=true;
 		if(way2Go.size()==0) {
 			//System.out.println("不知道要干啥");
 			return;
@@ -568,18 +569,53 @@ public class Player extends JLabel implements KeyListener{
 			{
 			case 1:
 				dir=Direction.U;
+				if(this.y/80-1>=0) {
+					if(!GameFrame.thismap.getBoxByXY(this.x/80,this.y/80-1).isDangerArea) {
+						isDangerAround=false;
+					}
+				}
 				break;
 			case 2:
 				dir=Direction.D;
+				if(this.y/80+1<12) {
+					if(!GameFrame.thismap.getBoxByXY(this.x/80,this.y/80+1).isDangerArea) {
+						isDangerAround=false;
+					}
+				}
 				break;
 			case 3:
 				dir=Direction.L;
+				if(this.x/80-1>=0) {
+					if(!GameFrame.thismap.getBoxByXY(this.x/80-1,this.y/80).isDangerArea) {
+						isDangerAround=false;
+					}
+				}
 				break;
 			case 4:
 				dir=Direction.R;
+				if(this.x/80+1<15) {
+					if(!GameFrame.thismap.getBoxByXY(this.x/80+1,this.y/80).isDangerArea) {
+						isDangerAround=false;
+					}
+				}
 				break;
 			default:
 				break;
+			}
+			if(isDangerAround) {
+				System.out.print("前方有危险");
+				if( this.y/80-1>=0 && !GameFrame.thismap.getBoxByXY(this.x/80,this.y/80-1).isDangerArea) {
+					dir=Direction.U;
+				}
+				else if( this.y/80+1<12 && !GameFrame.thismap.getBoxByXY(this.x/80,this.y/80+1).isDangerArea) {
+					dir=Direction.D;
+				}
+				else if( this.x/80-1>=0 && !GameFrame.thismap.getBoxByXY(this.x/80-1,this.y/80).isDangerArea) {
+					dir=Direction.L;
+				}
+				else if( this.x/80+1<15 && !GameFrame.thismap.getBoxByXY(this.x/80+1,this.y/80).isDangerArea) {
+					dir=Direction.R;
+				}
 			}
 			System.out.println(dir);
 			move();

@@ -36,7 +36,7 @@ public class Bomb{
 					mybox.isExistPlayer=true;
 					myplayer.bombexist++;//玩家当前存在的炸弹数+1
 					try {
-						int DangerTime=(80/GameFrame.player2.speed)*40*4;
+						int DangerTime=(80/GameFrame.player2.speed)*40*5;
 						if(DangerTime>2000) {
 							DangerTime=2000;
 						}
@@ -315,6 +315,12 @@ public class Bomb{
 				explodeCache.add(temp);//将该处添加到爆炸缓存中
 				setIcon("images/LR.png",temp);//设置该处的爆炸图片
 			}
+		}
+		try {
+			Thread.sleep(100);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 		removeBoomArea();
 	}
