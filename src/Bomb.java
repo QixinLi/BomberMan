@@ -17,49 +17,58 @@ public class Bomb{
 	public Bomb(Player pl)
 	{
 		myplayer=pl;
-		power=myplayer.power;//获取玩家当前的威力
 		x=(int) Math.rint((pl.getX()+40)/80);//获得当前x值
 		y=(int) Math.rint((pl.getY()+40)/80);//获得当前y值
 		mybox=GameFrame.thismap.getBoxByXY(x,y);//获取当前所在的box
-		pl.thisbomb=mybox;//设置玩家当前炸弹为当前所在box
-		mybox.boom=this;//设置当前所在box处的boom值
+		power=myplayer.power;//获取玩家当前的威力
+		DropBoom(pl);
+	}
+	
+	public synchronized void DropBoom(Player pl) {
 		//如果当前位置没有炸弹并且玩家所放炸弹数也没有达到上限，便放置一颗炸弹
-		if(!mybox.isExistBomb&&myplayer.bombexist<myplayer.bombnum)
-		{
-			setIcon("images/bomb.gif",mybox);//将当前box图片设置为炸弹
-			setBoomArea();
-			Thread th=new Thread(){//定义一个新的线程
-				public void run(){
+				if(!mybox.isExistBomb&&myplayer.bombexist<myplayer.bombnum)
+				{
 					//将mybox处定义炸弹的参数赋值true
 					mybox.isExistBomb=true;
 					mybox.needDetonate=true;
 					mybox.isExistPlayer=true;
+
+					myplayer.thisbomb=mybox;//设置玩家当前炸弹为当前所在box
+					mybox.boom=this;//设置当前所在box处的boom值
+					
 					myplayer.bombexist++;//玩家当前存在的炸弹数+1
-					try {
-						int DangerTime=(80/GameFrame.player2.speed)*40*5;
-						if(DangerTime>2000) {
-							DangerTime=2000;
+					setIcon("images/bomb.gif",mybox);//将当前box图片设置为炸弹
+					setBoomArea();
+					//setDangerArea();
+					Thread th=new Thread(){//定义一个新的线程
+						public void run(){
+							try {
+								int DangerTime;
+								if(GameFrame.player2.speed<14) {
+									DangerTime=1500;
+								}
+								else{
+									DangerTime=2000;
+								}
+								Thread.sleep(2000-DangerTime);
+								setDangerArea();
+								Thread.sleep(DangerTime);
+								if(mybox.needDetonate)//如果炸弹需要自行引爆，则引爆
+								{
+									E_V();
+								}
+							} catch (InterruptedException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
 						}
-						//System.out.println("dangertime"+DangerTime);
-						Thread.sleep(2000-DangerTime);
-						setDangerArea();
-						Thread.sleep(DangerTime);
-					} catch (InterruptedException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-					if(mybox.needDetonate)//如果炸弹需要自行引爆，则引爆
-					{
-						E_V();
-					}
+					};
+					th.start();
+					System.out.println("丢炸弹");
 				}
-			};
-			th.start();
-			System.out.println("丢炸弹");
-		}
 	}
 	
-	public void E_V(){//爆炸-消失
+	public void E_V() throws InterruptedException{//爆炸-消失
 		Explode();//爆炸
 		try {
 			Thread.sleep(250);
@@ -70,7 +79,7 @@ public class Bomb{
 		Vanish();//消失
 	}
 	
-	public void setBoomArea()
+	public synchronized void setBoomArea()
 	{
 		bombarea.clear();
 		box thistemp=GameFrame.thismap.getBoxByXY(x,y);
@@ -97,8 +106,10 @@ public class Bomb{
 						break;
 					}
 				}
-				temp.isBoomArea=true;
-				bombarea.add(temp);//将该处添加到爆炸缓存中
+				else {
+					temp.isBoomArea=true;
+					bombarea.add(temp);//将该处添加到爆炸缓存中
+				}
 			}
 		}
 		for(d=1;d<=power;d++)//向下爆炸
@@ -120,8 +131,10 @@ public class Bomb{
 						break;
 					}
 				}
-				temp.isBoomArea=true;
-				bombarea.add(temp);//将该处添加到爆炸缓存中
+				else {
+					temp.isBoomArea=true;
+					bombarea.add(temp);//将该处添加到爆炸缓存中
+				}
 			}
 		}
 		for(l=1;l<=power;l++)//向左爆炸
@@ -143,8 +156,10 @@ public class Bomb{
 						break;
 					}
 				}
-				temp.isBoomArea=true;
-				bombarea.add(temp);//将该处添加到爆炸缓存中
+				else {
+					temp.isBoomArea=true;
+					bombarea.add(temp);//将该处添加到爆炸缓存中
+				}
 			}
 		}
 		for(r=1;r<=power;r++)//向右爆炸
@@ -166,31 +181,37 @@ public class Bomb{
 						break;
 					}
 				}
-				temp.isBoomArea=true;
-				bombarea.add(temp);//将该处添加到爆炸缓存中
+				else {
+					temp.isBoomArea=true;
+					bombarea.add(temp);//将该处添加到爆炸缓存中
+				}
 			}
 		}
 	}
 
-	public void setDangerArea()
+	public synchronized void setDangerArea()
 	{
 		for(int i=0;i<bombarea.size();i++)
 		{
-			bombarea.get(i).isDangerArea=true;
+			bombarea.get(i).isDangerArea++;
 		}
 	}
 	
-	public void removeBoomArea()
+	public synchronized void removeBoomArea()
 	{
 		for(int i=0;i<bombarea.size();i++)
 		{
 			bombarea.get(i).isBoomArea=false;
-			bombarea.get(i).isDangerArea=false;
+			bombarea.get(i).isDangerArea--;
 		}
 	}
 	
-	public void Explode()//爆炸
+	public synchronized void Explode() throws InterruptedException//爆炸
 	{
+		if(!mybox.needDetonate) {
+			mybox.needVanish=false;
+			return;
+		}
 		//将mybox处定义炸弹的参数赋值false
 		//mybox.isExist=false;
 		mybox.isExistBomb=false;
@@ -221,7 +242,17 @@ public class Bomb{
 				}
 				else if(temp.isExistBomb)//如果该爆炸处有炸弹
 				{
-					temp.boom.Explode();//引爆该处的炸弹
+					Thread th=new Thread() {
+						public void run() {
+							try {
+								temp.boom.Explode();
+							} catch (InterruptedException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}//引爆该处的炸弹
+						}
+					};
+					th.start();
 					explodeBomb.add(temp);//将该炸弹添加到被引爆的列表里
 				}
 				explodePlayer(temp);//判断是否炸到了玩家
@@ -250,7 +281,17 @@ public class Bomb{
 				}
 				else if(temp.isExistBomb)//如果该爆炸处有炸弹
 				{
-					temp.boom.Explode();//引爆该处的炸弹
+					Thread th=new Thread() {
+						public void run() {
+							try {
+								temp.boom.Explode();
+							} catch (InterruptedException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}//引爆该处的炸弹
+						}
+					};
+					th.start();
 					explodeBomb.add(temp);//将该炸弹添加到被引爆的列表里
 				}
 				explodePlayer(temp);//判断是否炸到了玩家
@@ -279,7 +320,17 @@ public class Bomb{
 				}
 				else if(temp.isExistBomb)//如果该爆炸处有炸弹
 				{
-					temp.boom.Explode();//引爆该处的炸弹
+					Thread th=new Thread() {
+						public void run() {
+							try {
+								temp.boom.Explode();
+							} catch (InterruptedException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}//引爆该处的炸弹
+						}
+					};
+					th.start();
 					explodeBomb.add(temp);//将该炸弹添加到被引爆的列表里
 				}
 				explodePlayer(temp);//判断是否炸到了玩家
@@ -308,19 +359,23 @@ public class Bomb{
 				}
 				else if(temp.isExistBomb)//如果该爆炸处有炸弹
 				{
-					temp.boom.Explode();//引爆该处的炸弹
+					Thread th=new Thread() {
+						public void run() {
+							try {
+								temp.boom.Explode();
+							} catch (InterruptedException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}//引爆该处的炸弹
+						}
+					};
+					th.start();
 					explodeBomb.add(temp);//将该炸弹添加到被引爆的列表里
 				}
 				explodePlayer(temp);//判断是否炸到了玩家
 				explodeCache.add(temp);//将该处添加到爆炸缓存中
 				setIcon("images/LR.png",temp);//设置该处的爆炸图片
 			}
-		}
-		try {
-			Thread.sleep(100);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
 		removeBoomArea();
 	}
@@ -353,20 +408,35 @@ public class Bomb{
 		}
 	}
 	
-	public void Vanish()//清除爆炸波纹
+	public synchronized void Vanish()//清除爆炸波纹
 	{
 		setIcon("images/default.png",mybox);//清除中心爆炸块
 		for(int i=0;i<explodeCache.size();i++)//清除爆炸缓存中的爆炸块
 		{
 			setIcon("images/default.png",explodeCache.get(i));//将被清除的路径上的爆炸块恢复成透明块
 		}
-		for(int i=0;i<explodeBomb.size();i++)//清除路径上被引爆的爆炸块
-		{
-			explodeBomb.get(i).boom.Vanish();//调用路径上每个被引爆的爆炸块的清除方法
+		Thread th=new Thread() {
+			public void run() {
+				for(int i=0;i<explodeBomb.size();i++)//清除路径上被引爆的爆炸块
+				{
+					/*explodeBomb.get(i).isBoomArea=false;
+					explodeBomb.get(i).isDangerArea--;*/
+					explodeBomb.get(i).boom.Vanish();//调用路径上每个被引爆的爆炸块的清除方法
+				}
+			}
+		};
+		th.start();
+		
+		System.out.println();
+		for(int i=0;i<12;i++) {
+			for(int j=0;j<15;j++) {
+				System.out.print(GameFrame.thismap.getBoxByXY(j,i).isDangerArea+" ");
+			}
+			System.out.println();
 		}
 	}
 	
-	void explodePlayer(box b)//判断是否炸到玩家
+	public synchronized void explodePlayer(box b)//判断是否炸到玩家
 	{
 		if(b.getRect().intersects(GameFrame.player1.getRect())
 				&&!GameFrame.player1.invincible
